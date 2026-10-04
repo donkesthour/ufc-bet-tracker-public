@@ -14,5 +14,6 @@ repo.upsert_event({'id':'test-card','name':'Browser verification card','event_da
 repo.replace_event_fights('test-card',[{'fighter_a':'Fighter Alpha','fighter_b':'Fighter Bravo','odds_a':150,'odds_b':-180,'rounds':3,'is_main':True}])
 repo.set_active_event('test-card')
 os.environ['UFC_V3_DB']=str(path)
+os.environ['UFC_V3_UPDATE_DISABLE']='1'
 import uvicorn
 uvicorn.run('app:app',host='127.0.0.1',port=18212)

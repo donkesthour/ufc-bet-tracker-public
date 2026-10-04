@@ -259,6 +259,8 @@ def _git(*args: str) -> tuple[int, str]:
 @app.get("/api/update/check")
 def update_check():
     """Report whether origin/main is ahead of the running checkout."""
+    if os.environ.get("UFC_V3_UPDATE_DISABLE"):
+        return {"repo": False, "behind": 0, "current": "", "has_updates": False}
     code, _ = _git("rev-parse", "--is-inside-work-tree")
     if code != 0:
         return {"repo": False, "behind": 0, "current": "", "has_updates": False}

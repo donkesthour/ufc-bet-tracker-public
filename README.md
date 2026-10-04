@@ -1,46 +1,126 @@
 # UFC Bet Tracker
 
-A self-hosted tracker for UFC bets: log singles and parlays, settle them per leg,
-see P/L by event and matchup, and follow a card live with an outcome matrix.
-FastAPI + SQLite, plain JS front end. Your data stays in one local `.db` file.
+Self-hosted tracker for UFC betting. Log singles and parlays, settle them per leg,
+watch a card live with an outcome matrix, and see P/L by event and matchup.
+FastAPI + SQLite on the backend, plain JavaScript on the frontend. All your data
+lives in one local `.db` file — nothing leaves your machine.
 
 ## Quick start
 
 ```bash
-./launch.sh            # first run: creates venv, installs deps, opens the page
-# options: --host 0.0.0.0 --port 8212 --no-open
+./launch.sh
 ```
 
-Open http://127.0.0.1:8212. The database is created on first run. Use
-**Sync all cards** to load the bundled event catalog, then pick an active event.
+That's it. On first run the script creates a Python virtual environment,
+installs dependencies, starts the server on
+[http://127.0.0.1:8212](http://127.0.0.1:8212), and opens the page in your
+browser. Run it again any time to start the app.
+
+Options:
+
+```bash
+./launch.sh --host 0.0.0.0 --port 8212 --no-open
+```
+
+Prefer to run it yourself:
+
+```bash
+python3 -m venv venv && . venv/bin/activate
+pip install -r requirements.txt
+uvicorn app:app --host 127.0.0.1 --port 8212
+```
+
+The SQLite database is created automatically on first run. Click **Sync all
+cards** to load the bundled event catalog, then pick an active event and start
+logging bets.
+
+## Using the tracker
+
+- **Fight desk** — the main page. Pick the active event, log bets through the
+  guided ticket (sportsbook → matchup → bet type → selection → odds → stake),
+  and settle them from the ledger. Singles and parlays both supported; parlays
+  settle per leg and auto-settle the ticket when every leg is decided.
+- **Bet types** — moneyline, method of victory, round props, totals (over/under),
+  go the distance, specials, and custom matchups for bets that aren't on a card.
+- **Bonus bets** — tick the Bonus box on the ticket; they're graded as stake-free
+  cash (winnings only).
+- **Ledger** — filter by status, sportsbook, or matchup; edit/duplicate rows;
+  correct the actual bookmaker payout after a settlement.
+- **Watch along** — a second page for fight night: matchup P/L, an outcome
+  matrix showing what every pending ticket is worth for each possible result,
+  and optional ESPN result sync (display only — it never rewrites your bets).
+- **Statistics** — per-event and all-time P/L, ROI, win rate, and a cumulative
+  P/L chart (straight bets and parlays split evenly across legs).
+- **Export JSON** (header) — download everything as JSON for backup. Copying
+  the `.db` file while the app is stopped also works.
+
+## Updating
+
+Two ways to pull new features:
+
+**In-app (recommended).** When the repository has newer commits than your
+checkout, an **↑ Update (n)** button appears in the header (top right). Click
+it: the app pulls the latest code, installs any new dependencies, restarts
+itself, and reloads the page.
+
+**From the terminal.**
+
+```bash
+git pull
+# if requirements.txt changed:
+pip install -r requirements.txt
+# then restart the app (Ctrl+C and ./launch.sh again)
+```
+
+The update endpoints are restricted to requests from the same machine
+(localhost), so a LAN visitor can't trigger them.
 
 ## Configuration
 
-Copy `.env.example` and export the variables (or set them in your service unit):
+Copy `.env.example` to `.env` (the launch script loads it automatically):
 
 | Variable | Purpose |
 |---|---|
 | `UFC_V3_DB` | SQLite file path (default `./ufc-bet-tracker-v3.db`) |
-| `THE_ODDS_API_KEY` | Optional; enables **Refresh odds** (moneylines from DraftKings/FanDuel) |
+| `THE_ODDS_API_KEY` | Optional — enables **Refresh odds** (moneylines from DraftKings/FanDuel via [the-odds-api.com](https://the-odds-api.com)) |
+| `UFC_V3_UPDATE_DISABLE` | Set to `1` to hide the in-app updater |
 
-To share it on your LAN, bind `--host 0.0.0.0`. There is no authentication, so
-don't expose it to the internet.
+## Running as a service
 
-## Features
-- Guided ticket entry (moneyline, method, round, totals, parlays, specials)
-- Per-leg parlay settlement, bonus bets, cash-stake quick-add
-- Per-event P/L charts, ledger filters, backups via `/api/export`
-- Watch-along page with outcome matrix and ESPN result sync
+Example systemd user unit:
 
-## Tests
+```ini
+[Unit]
+Description=UFC Bet Tracker
+After=network.target
 
-```bash
-python -m unittest discover -s tests -v
-npm ci && npx playwright install chromium && npx playwright test   # browser tests
+[Service]
+Type=simple
+WorkingDirectory=/path/to/ufc-bet-tracker
+Environment=UFC_V3_DB=/path/to/ufc-bet-tracker-v3.db
+ExecStart=/path/to/ufc-bet-tracker/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8212
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
 ```
 
-## Backups
-`GET /api/export` returns all data as JSON. Copying the `.db` file while the app is stopped also works.
+> **Note:** the app has no authentication. It's meant for personal use on a
+> trusted network — don't forward it to the internet.
+
+## Development
+
+```bash
+python -m unittest discover -s tests -v          # API and repository tests
+npm ci && npx playwright install chromium
+npx playwright test                              # browser contract tests
+node --check static/app.js                       # JS syntax
+```
+
+The Playwright suite starts its own isolated server with a throwaway database;
+it never touches yours.
 
 ## License
-MIT
+
+[MIT](LICENSE)

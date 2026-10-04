@@ -11,7 +11,7 @@ class APITests(unittest.TestCase):
         with socket.socket() as s:
             s.bind(('127.0.0.1',0)); port=s.getsockname()[1]
         cls.base=f'http://127.0.0.1:{port}'
-        cls.env={**os.environ,'UFC_V3_DB':str(Path(cls.tmp.name)/'test.db')}
+        cls.env={**os.environ,'UFC_V3_UPDATE_DISABLE':'1','UFC_V3_DB':str(Path(cls.tmp.name)/'test.db')}
         cls.command=[sys.executable,'-m','uvicorn','app:app','--host','127.0.0.1','--port',str(port)]
         cls.start()
     @classmethod
