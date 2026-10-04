@@ -54,6 +54,28 @@ logging bets.
 - **Export JSON** (header) — download everything as JSON for backup. Copying
   the `.db` file while the app is stopped also works.
 
+## Running on Windows
+
+1. Install Python from [python.org/downloads](https://www.python.org/downloads/) — tick **Add python.exe to PATH** during install.
+2. Double-click **setup.bat** (one time).
+3. Double-click **start.bat** whenever you want to use the tracker. It opens the page and prints the addresses you can share. **stop.bat** stops it.
+4. The first start may ask Windows Firewall for permission — click **Allow**.
+
+## Sharing with someone
+
+The tracker has no login, so choose the sharing method carefully:
+
+- **Same Wi-Fi / house network:** run `start.bat` and share the
+  `http://<PC-IP>:8214` address it prints. Works for anyone connected to your
+  router; nothing is exposed to the internet.
+- **Over the internet:** run `start.bat`, then double-click
+  **share-online.bat**. It creates a temporary public link
+  (`https://<random>.trycloudflare.com`) that you can send to anyone. The link
+  changes every time, and **anyone who has it can see and edit your bets** — it
+  disappears when you close the window.
+- **Private, permanent access:** install [Tailscale](https://tailscale.com) on
+  both machines (free) and use the tailnet address. Requires no open ports.
+
 ## Updating
 
 Two ways to pull new features:
