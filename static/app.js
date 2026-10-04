@@ -393,6 +393,23 @@ $('#sync-upcoming').onclick = async () => {
     btn.disabled = false;
   }
 };
+$('#poster-refresh').onclick = async () => {
+  if (!active?.id) { message('No active event to set a poster for.', true); return; }
+  const current = (active.poster_url || '').trim();
+  const url = prompt(`Poster image URL for ${active.name || 'this event'}\n(paste an official image link, or clear the box to remove the poster):`, current);
+  if (url === null) return;
+  const trimmed = url.trim();
+  if (trimmed && !/^https?:\/\//i.test(trimmed)) { message('Poster URL must start with http:// or https://', true); return; }
+  if (trimmed === current) return;
+  const btn = $('#poster-refresh'); btn.disabled = true;
+  try {
+    await api('api/events/' + encodeURIComponent(active.id) + '/poster', {method:'PATCH', ...json({poster_url: trimmed})});
+    message(trimmed ? 'Poster updated.' : 'Poster cleared.');
+    await loadEvents();
+  } catch (error) {
+    message('Poster update failed: ' + error.message, true);
+  } finally { btn.disabled = false; }
+};
 $('#refresh-odds').onclick = async () => {
   if (!active?.id) return;
   const btn = $('#refresh-odds'); btn.disabled = true;
