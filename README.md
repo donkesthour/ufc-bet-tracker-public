@@ -7,10 +7,10 @@ lives in one local `.db` file — nothing leaves your machine.
 
 ## Quick start — Windows
 
-1. Install Python from [python.org/downloads](https://www.python.org/downloads/) — tick **Add python.exe to PATH** during install.
-2. Download this repository (**Code → Download ZIP**), then unzip it.
-3. Double-click **setup.bat** — one time.
-4. Double-click **start.bat** whenever you want to use the tracker. It opens
+1. Download this repository (**Code → Download ZIP**), then unzip it.
+2. Double-click **setup.bat** — one time. It installs Python automatically if
+   it's missing (no admin rights needed), then sets everything else up.
+3. Double-click **start.bat** whenever you want to use the tracker. It opens
    the page and prints the addresses. **stop.bat** stops it.
 
 The first start may ask Windows Firewall for permission — click **Allow**.
