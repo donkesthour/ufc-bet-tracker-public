@@ -916,7 +916,7 @@ loadEvents().catch(error=>{ $('#connection').textContent='Connection needs atten
   const btn=document.getElementById('update-btn');
   if(!btn) return;
   fetch('api/update/check').then(r=>r.ok?r.json():null).then(info=>{
-    if(info&&info.repo&&info.has_updates){
+    if(info&&info.has_updates&&(info.repo?info.behind>0:true)){
       btn.hidden=false;
       btn.textContent='\u2191 Update ('+info.behind+')';
     }
