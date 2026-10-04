@@ -5,7 +5,17 @@ watch a card live with an outcome matrix, and see P/L by event and matchup.
 FastAPI + SQLite on the backend, plain JavaScript on the frontend. All your data
 lives in one local `.db` file — nothing leaves your machine.
 
-## Quick start
+## Quick start — Windows
+
+1. Install Python from [python.org/downloads](https://www.python.org/downloads/) — tick **Add python.exe to PATH** during install.
+2. Download this repository (**Code → Download ZIP**), then unzip it.
+3. Double-click **setup.bat** — one time.
+4. Double-click **start.bat** whenever you want to use the tracker. It opens
+   the page and prints the addresses. **stop.bat** stops it.
+
+The first start may ask Windows Firewall for permission — click **Allow**.
+
+## Quick start — Mac / Linux
 
 ```bash
 ./launch.sh
@@ -54,13 +64,6 @@ logging bets.
 - **Export JSON** (header) — download everything as JSON for backup. Copying
   the `.db` file while the app is stopped also works.
 
-## Running on Windows
-
-1. Install Python from [python.org/downloads](https://www.python.org/downloads/) — tick **Add python.exe to PATH** during install.
-2. Double-click **setup.bat** (one time).
-3. Double-click **start.bat** whenever you want to use the tracker. It opens the page and prints the addresses you can share. **stop.bat** stops it.
-4. The first start may ask Windows Firewall for permission — click **Allow**.
-
 ## Sharing with someone
 
 The tracker has no login, so choose the sharing method carefully:
@@ -80,10 +83,11 @@ The tracker has no login, so choose the sharing method carefully:
 
 Two ways to pull new features:
 
-**In-app (recommended).** When the repository has newer commits than your
-checkout, an **↑ Update (n)** button appears in the header (top right). Click
-it: the app pulls the latest code, installs any new dependencies, restarts
-itself, and reloads the page.
+**In-app (recommended).** An **↑ Update** button appears in the header (top
+right) when a newer version is available. Click it: the app pulls the latest
+code, installs any new dependencies, restarts itself, and reloads the page.
+This works for git clones **and** for ZIP downloads (a ZIP install refreshes
+itself by re-downloading the archive — your database and settings are kept).
 
 **From the terminal.**
 
@@ -93,6 +97,8 @@ git pull
 pip install -r requirements.txt
 # then restart the app (Ctrl+C and ./launch.sh again)
 ```
+
+ZIP users: just click the in-app **↑ Update** button instead.
 
 The update endpoints are restricted to requests from the same machine
 (localhost), so a LAN visitor can't trigger them.

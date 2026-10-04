@@ -256,14 +256,25 @@ def _git(*args: str) -> tuple[int, str]:
     return proc.returncode, (proc.stdout + proc.stderr).strip()
 
 
+UPDATE_ZIP_URL = os.environ.get(
+    "UFC_V3_UPDATE_ZIP_URL",
+    "https://github.com/donkesthour/ufc-bet-tracker-public/archive/refs/heads/main.zip",
+).strip()
+ZIP_KEEP = {"venv", ".venv", "node_modules", ".git", "__pycache__", "test-results"}
+
+
 @app.get("/api/update/check")
 def update_check():
-    """Report whether origin/main is ahead of the running checkout."""
+    """Report whether origin/main is ahead of the running checkout.
+
+    Non-git installs (e.g. a downloaded ZIP) always offer an update: applying it
+    re-downloads the latest archive and refreshes the code files in place.
+    """
     if os.environ.get("UFC_V3_UPDATE_DISABLE"):
         return {"repo": False, "behind": 0, "current": "", "has_updates": False}
     code, _ = _git("rev-parse", "--is-inside-work-tree")
     if code != 0:
-        return {"repo": False, "behind": 0, "current": "", "has_updates": False}
+        return {"repo": False, "zip": True, "behind": 0, "current": "", "has_updates": True}
     code, current = _git("rev-parse", "--short", "HEAD")
     code2, _ = _git("fetch", "origin", "--quiet")
     if code2 != 0:
@@ -275,15 +286,47 @@ def update_check():
     return {"repo": True, "behind": behind, "current": current, "has_updates": behind > 0}
 
 
+def _zip_update() -> str:
+    """Refresh code files from the release ZIP. Preserves DBs, .env and venv."""
+    import shutil
+    import tempfile
+    import zipfile
+
+    with tempfile.TemporaryDirectory(prefix="ufc-update-") as tmp:
+        archive = os.path.join(tmp, "update.zip")
+        with urlopen(UPDATE_ZIP_URL, timeout=120) as resp, open(archive, "wb") as fh:
+            fh.write(resp.read())
+        with zipfile.ZipFile(archive) as zf:
+            names = zf.namelist()
+            if not names or not all(n.startswith(names[0].split("/")[0] + "/") for n in names):
+                raise ValueError("unexpected archive layout")
+            zf.extractall(tmp)
+        extracted = os.path.join(tmp, names[0].split("/")[0])
+        for root, dirs, files in os.walk(extracted):
+            rel_root = os.path.relpath(root, extracted)
+            if rel_root.split(os.sep)[0] in ZIP_KEEP or "__pycache__" in rel_root:
+                dirs[:] = []
+                continue
+            target_dir = BASE_DIR if rel_root == "." else BASE_DIR / rel_root
+            target_dir.mkdir(parents=True, exist_ok=True)
+            for name in files:
+                shutil.copy2(os.path.join(root, name), target_dir / name)
+    return f"refreshed from {UPDATE_ZIP_URL}"
+
+
 @app.post("/api/update")
 def update(request: Request):
-    """Pull origin and install requirements. Loopback callers only."""
+    """Pull origin (or re-download the ZIP for non-git installs). Loopback only."""
     if not _loopback_client(request):
         raise HTTPException(status_code=403, detail="update allowed from localhost only")
-    code, out = _git("pull", "--ff-only", "origin")
+    code, _ = _git("rev-parse", "--is-inside-work-tree")
     if code != 0:
-        raise HTTPException(status_code=500, detail=out or "git pull failed")
-    lines = [out]
+        lines = [_zip_update()]
+    else:
+        code, out = _git("pull", "--ff-only", "origin")
+        if code != 0:
+            raise HTTPException(status_code=500, detail=out or "git pull failed")
+        lines = [out]
     reqs = BASE_DIR / "requirements.txt"
     if reqs.is_file():
         pip = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(reqs)],
