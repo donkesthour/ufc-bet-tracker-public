@@ -396,19 +396,31 @@ $('#sync-upcoming').onclick = async () => {
 $('#poster-refresh').onclick = async () => {
   if (!active?.id) { message('No active event to set a poster for.', true); return; }
   const current = (active.poster_url || '').trim();
-  const url = prompt(`Poster image URL for ${active.name || 'this event'}\n(paste an official image link, or clear the box to remove the poster):`, current);
-  if (url === null) return;
-  const trimmed = url.trim();
-  if (trimmed && !/^https?:\/\//i.test(trimmed)) { message('Poster URL must start with http:// or https://', true); return; }
-  if (trimmed === current) return;
   const btn = $('#poster-refresh'); btn.disabled = true;
   try {
+    if (!current) {
+      btn.textContent = 'Searching…';
+      try {
+        await api('api/events/' + encodeURIComponent(active.id) + '/poster/fetch', {method:'POST'});
+        message('Poster fetched from Wikipedia.');
+        await loadEvents();
+        return;
+      } catch (_) { message('No Wikipedia poster found for this event - paste a URL instead.', true); return; }
+    }
+    const url = prompt(`Poster image URL for ${active.name || 'this event'}\n(paste an official image link, or clear the box to remove the poster):`, current);
+    if (url === null) return;
+    const trimmed = url.trim();
+    if (trimmed && !/^https?:\/\//i.test(trimmed)) { message('Poster URL must start with http:// or https://', true); return; }
+    if (trimmed === current) return;
     await api('api/events/' + encodeURIComponent(active.id) + '/poster', {method:'PATCH', ...json({poster_url: trimmed})});
     message(trimmed ? 'Poster updated.' : 'Poster cleared.');
     await loadEvents();
   } catch (error) {
     message('Poster update failed: ' + error.message, true);
-  } finally { btn.disabled = false; }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↻ Poster';
+  }
 };
 $('#refresh-odds').onclick = async () => {
   if (!active?.id) return;

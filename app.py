@@ -5,6 +5,7 @@ import math
 import os
 import re
 import sqlite3
+import urllib.request
 import subprocess
 import sys
 import threading
@@ -12,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import URLError
+from urllib.parse import quote
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
@@ -393,7 +395,10 @@ def discover_upcoming_events():
         })
         fights = _espn_event_to_fights(saved["id"], espn_event)
         repo.replace_event_fights(saved["id"], fights)
-        added.append({"id": saved["id"], "name": saved["name"], "date": event_date, "fights": len(fights)})
+        poster = _wikipedia_poster(saved["name"])
+        if poster:
+            repo.update_event_poster(saved["id"], poster)
+        added.append({"id": saved["id"], "name": saved["name"], "date": event_date, "fights": len(fights), "poster": bool(poster)})
     return {"added": added, "added_count": len(added)}
 
 
@@ -511,6 +516,38 @@ def refresh_event_odds(event_id: str):
     updates, missing = odds_api.match_prices(fights, lines)
     repo.update_fight_odds(event_id, updates)
     return {"updated": len(updates), "missing": missing}
+
+
+def _wikipedia_poster(event_name: str) -> str | None:
+    """Best-effort official poster lookup via Wikipedia's page image for the event."""
+    if not (event_name or "").strip():
+        return None
+    url = ("https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages"
+           "&piprop=original&pilicense=any&generator=search&gsrlimit=1&gsrsearch="
+           + quote(f"{event_name} UFC"))
+    request = urllib.request.Request(url, headers={"User-Agent": "ufc-bet-tracker/1.0 (event poster lookup)"})
+    try:
+        with urlopen(request, timeout=15) as r:
+            payload = json.loads(r.read().decode("utf-8"))
+    except (URLError, TimeoutError):
+        return None
+    for page in (payload.get("query") or {}).get("pages", {}).values():
+        source = ((page.get("original") or {}).get("source") or "").split("?")[0]
+        if source.lower().endswith((".jpg", ".jpeg", ".png")):
+            return source
+    return None
+
+
+@app.post("/api/events/{event_id}/poster/fetch")
+def fetch_event_poster(event_id: str):
+    event = _event_by_id(event_id)
+    if not event:
+        api_error("event not found", 404)
+    url = _wikipedia_poster(event["name"])
+    if not url:
+        api_error("no poster found on Wikipedia for this event", 404)
+    saved = repo.update_event_poster(event_id, url)
+    return {"poster_url": saved["poster_url"], "source": "wikipedia"}
 
 
 @app.patch("/api/events/{event_id}/poster")
