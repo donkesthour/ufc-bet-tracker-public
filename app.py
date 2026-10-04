@@ -184,6 +184,12 @@ def sync_event_from_espn(event_id: str) -> dict:
 @app.on_event("startup")
 def startup():
     repo.initialize()
+    # Fresh installs have no events; load the bundled catalog so the picker works out of the box.
+    try:
+        if not repo.list_events():
+            sync_events_from_legacy()
+    except Exception as exc:  # never block startup on seeding
+        print(f"event seed skipped: {exc}")
 
 
 class LegIn(BaseModel):
