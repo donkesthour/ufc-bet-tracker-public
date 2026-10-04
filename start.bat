@@ -12,6 +12,9 @@ if not exist venv\Scripts\python.exe (
   pause
   exit /b 1
 )
+echo Checking app dependencies...
+venv\Scripts\python -m pip install --quiet --disable-pip-version-check -r requirements.txt
+if errorlevel 1 echo ^(Could not check dependencies - continuing; connect to the internet if the page shows errors.^)
 if exist .env for /f "usebackq eol=# tokens=1,* delims==" %%a in (".env") do set %%a=%%b
 echo ============================================================
 echo   UFC BET TRACKER is starting...
