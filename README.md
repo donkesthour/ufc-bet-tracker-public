@@ -7,9 +7,8 @@ FastAPI + SQLite, plain JS front end. Your data stays in one local `.db` file.
 ## Quick start
 
 ```bash
-python3 -m venv venv && . venv/bin/activate
-pip install -r requirements.txt
-uvicorn app:app --host 127.0.0.1 --port 8212
+./launch.sh            # first run: creates venv, installs deps, opens the page
+# options: --host 0.0.0.0 --port 8212 --no-open
 ```
 
 Open http://127.0.0.1:8212. The database is created on first run. Use
