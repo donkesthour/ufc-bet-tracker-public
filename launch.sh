@@ -27,6 +27,9 @@ if [ ! -x venv/bin/python ]; then
 fi
 PY=./venv/bin/python
 
+echo "Checking for updates..."
+$PY self_update.py || true
+
 echo "UFC Bet Tracker → http://$HOST:$PORT"
 [ "$OPEN" = 1 ] && { (xdg-open "http://$HOST:$PORT" >/dev/null 2>&1 || true) & }
 exec $PY -m uvicorn app:app --host "$HOST" --port "$PORT"

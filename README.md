@@ -5,6 +5,12 @@ watch a card live with an outcome matrix, and see P/L by event and matchup.
 FastAPI + SQLite on the backend, plain JavaScript on the frontend. All your data
 lives in one local `.db` file — nothing leaves your machine.
 
+## How it works
+
+![How the tracker works: you log a bet in the browser, the FastAPI server writes it straight to the SQLite .db file and reads it back; editing code either just needs a browser refresh (frontend) or a service restart (backend) — your .db is never touched either way.](docs/how-it-works.svg)
+
+Everything you log goes through one path: **Browser → FastAPI server → SQLite file** — and back. There's no local-storage copy to fall out of sync; the `.db` file is the single source of truth, so a page refresh always shows exactly what's saved. Updating the app's code never touches that file: frontend-only changes just need a browser refresh, backend changes need a server restart, and either way your bet history survives untouched.
+
 ## Quick start — Windows
 
 1. Download this repository (**Code → Download ZIP**), then unzip it.

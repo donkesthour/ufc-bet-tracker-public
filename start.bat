@@ -12,6 +12,8 @@ if not exist venv\Scripts\python.exe (
   pause
   exit /b 1
 )
+echo Checking for updates...
+venv\Scripts\python self_update.py
 echo Checking app dependencies...
 venv\Scripts\python -m pip install --quiet --disable-pip-version-check -r requirements.txt
 if errorlevel 1 echo ^(Could not check dependencies - continuing; connect to the internet if the page shows errors.^)
