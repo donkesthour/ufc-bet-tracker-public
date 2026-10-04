@@ -378,6 +378,21 @@ async function syncCards(scope = 'active') {
 }
 $('#sync-active').onclick = () => syncCards('active');
 $('#sync-all').onclick = () => syncCards('all');
+$('#sync-upcoming').onclick = async () => {
+  const btn = $('#sync-upcoming');
+  if (!btn || btn.disabled || saving) return;
+  btn.disabled = true;
+  message('Checking ESPN for upcoming cards…');
+  try {
+    const r = await api('api/events/discover', {method:'POST'});
+    await loadEvents();
+    message(r.added_count ? `Added ${r.added_count} new event${r.added_count === 1 ? '' : 's'}: ${r.added.map(e => `${e.name} (${e.date}, ${e.fights} fights)`).join(', ')}` : 'No new upcoming events found on ESPN.');
+  } catch (error) {
+    message('ESPN discovery failed: ' + error.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+};
 $('#refresh-odds').onclick = async () => {
   if (!active?.id) return;
   const btn = $('#refresh-odds'); btn.disabled = true;

@@ -364,6 +364,39 @@ def sync_all_events():
     return sync_events_from_legacy()
 
 
+@app.post("/api/events/discover")
+def discover_upcoming_events():
+    """Pull upcoming UFC cards straight from ESPN and add any not in the database yet."""
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    window = f"{today:%Y%m%d}-{(today + timedelta(days=30)):%Y%m%d}"
+    url = f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={window}"
+    try:
+        with urlopen(url, timeout=20) as r:
+            payload = json.loads(r.read().decode("utf-8"))
+    except (URLError, TimeoutError) as exc:
+        api_error(f"ESPN unreachable: {exc}", 502)
+    known = {str(e.get("espn_id") or "") for e in repo.list_events()}
+    known.discard("")
+    added = []
+    for espn_event in payload.get("events") or []:
+        espn_id = str(espn_event.get("id") or "")
+        if not espn_id or espn_id in known:
+            continue
+        event_date = (espn_event.get("date") or "")[:10]
+        if not event_date:
+            continue
+        saved = repo.upsert_event({
+            "id": f"event_espn_{espn_id}",
+            "name": espn_event.get("name") or espn_event.get("shortName") or f"UFC event {espn_id}",
+            "event_date": event_date,
+            "espn_id": espn_id,
+        })
+        fights = _espn_event_to_fights(saved["id"], espn_event)
+        repo.replace_event_fights(saved["id"], fights)
+        added.append({"id": saved["id"], "name": saved["name"], "date": event_date, "fights": len(fights)})
+    return {"added": added, "added_count": len(added)}
+
+
 def _espn_method(result: dict) -> str | None:
     name = f"{result.get('name', '')} {result.get('displayName', '')}".lower()
     if "decision" in name: return "dec"

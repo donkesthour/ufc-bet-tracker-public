@@ -103,6 +103,18 @@ ZIP users: just click the in-app **↑ Update** button instead.
 The update endpoints are restricted to requests from the same machine
 (localhost), so a LAN visitor can't trigger them.
 
+**Your data survives every update.** Your bets live in
+`ufc-bet-tracker-v3.db` in this folder. Both update paths preserve it: the
+in-app updater keeps the database, `.env` and venv; the ZIP itself ships no
+database, so extracting a fresh ZIP over this folder leaves your bets
+untouched.
+
+**New events.** Your database starts with the catalog bundled at release,
+which goes stale. On the Fight desk, **"Find upcoming cards"** pulls the
+next ~30 days of UFC events straight from ESPN and adds any card you don't
+have yet; **"Sync this card" / "Sync all cards"** refresh the fight cards
+of events you already have. Neither ever modifies your bets.
+
 ## Configuration
 
 Copy `.env.example` to `.env` (the launch script loads it automatically):
