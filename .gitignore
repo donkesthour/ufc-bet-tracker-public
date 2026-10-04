@@ -1,0 +1,11 @@
+venv/
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+*.db
+*.db-*
+*.bak*
+.env
+test-results/
+tests/browser-*/
