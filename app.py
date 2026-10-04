@@ -349,7 +349,18 @@ def restart(request: Request):
     if not _loopback_client(request):
         raise HTTPException(status_code=403, detail="restart allowed from localhost only")
     def _exec():
-        os.execv(sys.argv[0], sys.argv)
+        # Re-invoke through the interpreter explicitly rather than exec'ing
+        # sys.argv[0] directly: when started as `python -m uvicorn app:app`,
+        # argv[0] is uvicorn's __main__.py path, not something the OS can
+        # execute on its own, and os.execv additionally just errors out on
+        # Windows ("Exec format error") with no exec() family at all. Spawn a
+        # fresh process with the same argv under the same interpreter, then
+        # exit this one, on every platform.
+        popen_kwargs: dict[str, Any] = {"cwd": str(BASE_DIR)}
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        subprocess.Popen([sys.executable, *sys.argv], **popen_kwargs)
+        os._exit(0)
     threading.Timer(1.0, _exec).start()
     return {"ok": True, "detail": "restarting"}
 
