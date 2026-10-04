@@ -368,7 +368,7 @@ def sync_all_events():
 def discover_upcoming_events():
     """Pull upcoming UFC cards straight from ESPN and add any not in the database yet."""
     today = datetime.now(ZoneInfo("America/New_York")).date()
-    window = f"{today:%Y%m%d}-{(today + timedelta(days=30)):%Y%m%d}"
+    window = f"{(today - timedelta(days=14)):%Y%m%d}-{(today + timedelta(days=30)):%Y%m%d}"
     url = f"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates={window}"
     try:
         with urlopen(url, timeout=20) as r:
