@@ -244,6 +244,60 @@ def healthz():
     return {"ok": True, "storage": "sqlite"}
 
 
+def _loopback_client(request: Request) -> bool:
+    return bool(request.client) and request.client.host in ("127.0.0.1", "::1")
+
+
+def _git(*args: str) -> tuple[int, str]:
+    proc = subprocess.run(["git", *args], cwd=BASE_DIR, capture_output=True, text=True, timeout=120)
+    return proc.returncode, (proc.stdout + proc.stderr).strip()
+
+
+@app.get("/api/update/check")
+def update_check():
+    """Report whether origin/main is ahead of the running checkout."""
+    code, _ = _git("rev-parse", "--is-inside-work-tree")
+    if code != 0:
+        return {"repo": False, "behind": 0, "current": "", "has_updates": False}
+    code, current = _git("rev-parse", "--short", "HEAD")
+    code2, _ = _git("fetch", "origin", "--quiet")
+    if code2 != 0:
+        return {"repo": True, "behind": 0, "current": current, "has_updates": False, "fetch_error": True}
+    code3, behind = _git("rev-list", "--count", "HEAD..origin/HEAD")
+    if code3 != 0:
+        code3, behind = _git("rev-list", "--count", "HEAD..origin/main")
+    behind = int(behind or 0) if code3 == 0 else 0
+    return {"repo": True, "behind": behind, "current": current, "has_updates": behind > 0}
+
+
+@app.post("/api/update")
+def update(request: Request):
+    """Pull origin and install requirements. Loopback callers only."""
+    if not _loopback_client(request):
+        raise HTTPException(status_code=403, detail="update allowed from localhost only")
+    code, out = _git("pull", "--ff-only", "origin")
+    if code != 0:
+        raise HTTPException(status_code=500, detail=out or "git pull failed")
+    lines = [out]
+    reqs = BASE_DIR / "requirements.txt"
+    if reqs.is_file():
+        pip = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(reqs)],
+                             capture_output=True, text=True, timeout=600)
+        lines.append(pip.stdout.strip() or "requirements OK")
+    return {"ok": True, "output": "\n".join(lines)}
+
+
+@app.post("/api/restart")
+def restart(request: Request):
+    """Re-exec this process so pulled changes take effect."""
+    if not _loopback_client(request):
+        raise HTTPException(status_code=403, detail="restart allowed from localhost only")
+    def _exec():
+        os.execv(sys.argv[0], sys.argv)
+    threading.Timer(1.0, _exec).start()
+    return {"ok": True, "detail": "restarting"}
+
+
 @app.get("/api/events")
 def events():
     return {"events": repo.list_events(), "active_event": repo.active_event()}

@@ -895,3 +895,38 @@ fillRounds();
 let chartResizeTimer;
 window.addEventListener('resize',()=>{ clearTimeout(chartResizeTimer); chartResizeTimer=setTimeout(()=>{ if(latestTimeline) renderProfitChart(latestTimeline); },120); });
 loadEvents().catch(error=>{ $('#connection').textContent='Connection needs attention';message('Could not load: '+error.message+'. Use Refresh to retry.',true); });
+
+// In-app updater: header button appears when origin/main is ahead.
+(function(){
+  const btn=document.getElementById('update-btn');
+  if(!btn) return;
+  fetch('api/update/check').then(r=>r.ok?r.json():null).then(info=>{
+    if(info&&info.repo&&info.has_updates){
+      btn.hidden=false;
+      btn.textContent='\u2191 Update ('+info.behind+')';
+    }
+  }).catch(()=>{});
+  btn.addEventListener('click',async()=>{
+    btn.disabled=true; btn.textContent='Updating\u2026';
+    try{
+      const res=await fetch('api/update',{method:'POST'});
+      const body=await res.json().catch(()=>({}));
+      if(!res.ok){ throw new Error(body.detail||('HTTP '+res.status)); }
+      btn.textContent='Restarting\u2026';
+      await fetch('api/restart',{method:'POST'});
+      const deadline=Date.now()+20000;
+      while(Date.now()<deadline){
+        await new Promise(r=>setTimeout(r,1000));
+        try{
+          const h=await fetch('healthz',{cache:'no-store'});
+          if(h.ok){ location.reload(); return; }
+        }catch(err){ /* keep waiting */ }
+      }
+      message('Updated, but the service did not come back within 20s. Start it again with ./launch.sh or your service unit.',true);
+      btn.hidden=true;
+    }catch(err){
+      message('Update failed: '+err.message,true);
+      btn.disabled=false; btn.textContent='\u2191 Update';
+    }
+  });
+})();
