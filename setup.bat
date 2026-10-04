@@ -2,6 +2,8 @@
 rem One-time setup for the UFC Bet Tracker on Windows.
 rem Installs Python automatically if it is missing (no admin rights needed).
 cd /d "%~dp0"
+echo Working in: %CD%
+echo.
 
 set "PYEXE="
 where py >nul 2>nul && set "PYEXE=py -3"
@@ -28,13 +30,29 @@ if not defined PYEXE (
   pause
   exit /b 1
 )
+echo Using Python: %PYEXE%
 
 if not exist venv (
   echo Creating the app environment ^(one time^)...
   %PYEXE% -m venv venv
 )
+if not exist venv\Scripts\python.exe (
+  echo.
+  echo ERROR: the app environment was not created in this folder.
+  echo Make sure you extracted the ZIP first ^(right-click ^> Extract All^),
+  echo then run this setup.bat from inside the extracted folder.
+  pause
+  exit /b 1
+)
+
 echo Installing app dependencies...
 venv\Scripts\python -m pip install --quiet --disable-pip-version-check -r requirements.txt
+if errorlevel 1 (
+  echo ERROR: installing dependencies failed. Check your internet connection
+  echo and run setup.bat again.
+  pause
+  exit /b 1
+)
 
 echo.
 echo ============================================================

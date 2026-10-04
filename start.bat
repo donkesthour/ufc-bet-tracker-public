@@ -2,8 +2,13 @@
 rem Start the UFC Bet Tracker web page.
 cd /d "%~dp0"
 set PORT=8214
-if not exist venv\Scripts\python (
-  echo Run setup.bat first.
+if not exist venv\Scripts\python.exe (
+  echo The app environment was not found in this folder:
+ echo   %CD%
+  echo.
+  echo Fix: run setup.bat in this SAME folder first.
+  echo ^(If you just downloaded the ZIP: right-click it ^> Extract All,
+  echo  then run setup.bat inside the extracted folder.^)
   pause
   exit /b 1
 )
