@@ -1,5 +1,7 @@
 """UFC Bet Tracker v3: SQLite is the only application-data store."""
+import csv
 import hashlib
+import io
 import json
 import math
 import os
@@ -18,7 +20,7 @@ from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from db import TrackerRepository
@@ -510,6 +512,40 @@ def sync_one_event(event_id: str):
     return sync_event_from_espn(event_id)
 
 
+ENV_FILE = BASE_DIR / ".env"
+
+
+def _read_env_key() -> str:
+    key = os.environ.get("THE_ODDS_API_KEY", "").strip()
+    if key or not ENV_FILE.exists(): return key
+    for line in ENV_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if line.strip().startswith("THE_ODDS_API_KEY="):
+            return line.split("=", 1)[1].strip().strip("\"'")
+    return ""
+
+
+@app.get("/api/odds-key")
+def odds_key_status():
+    return {"configured": bool(_read_env_key())}
+
+
+@app.post("/api/odds-key")
+async def set_odds_key(request: Request):
+    """Save THE_ODDS_API_KEY to .env (never echoed back). Loopback only."""
+    if not _loopback_client(request):
+        raise HTTPException(status_code=403, detail="the key can only be set from the machine running the tracker")
+    body = await request.json()
+    key = str(body.get("key", "")).strip() if isinstance(body, dict) else ""
+    if not re.fullmatch(r"[A-Za-z0-9]{16,64}", key): api_error("That doesn't look like an Odds API key (letters and numbers only, ~32 characters).")
+    lines = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
+    lines = [l for l in lines if not l.strip().startswith("THE_ODDS_API_KEY=")] + [f"THE_ODDS_API_KEY={key}"]
+    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try: ENV_FILE.chmod(0o600)
+    except OSError: pass
+    os.environ["THE_ODDS_API_KEY"] = key
+    return {"configured": True}
+
+
 @app.post("/api/events/{event_id}/odds")
 def refresh_event_odds(event_id: str):
     event = repo.active_event(auto_advance=False) if False else next((e for e in repo.list_events() if e["id"] == event_id), None)
@@ -518,6 +554,7 @@ def refresh_event_odds(event_id: str):
     if fights is None:
         with repo.connection() as conn:
             fights = [dict(r) for r in conn.execute("SELECT fight_index,fighter_a,fighter_b FROM fights WHERE event_id=? ORDER BY fight_index", (event_id,))]
+    if not os.environ.get("THE_ODDS_API_KEY") and _read_env_key(): os.environ["THE_ODDS_API_KEY"] = _read_env_key()
     try:
         lines = odds_api.fetch_moneylines()
     except RuntimeError as exc:
@@ -670,6 +707,29 @@ def dashboard(event_id: str | None = None):
 @app.get("/api/export")
 def export():
     return repo.export()
+
+
+def _csv_cell(v):
+    if v is None: return ""
+    if isinstance(v, str) and v and v[0] in "=+-@\t\r": return "'" + v  # block spreadsheet formula injection
+    return v
+
+
+@app.get("/api/export.csv")
+def export_csv():
+    cols = ["placed_at", "event_name", "book", "fight_name", "bet_type", "selection", "market", "round_label",
+            "american_odds", "cash_stake", "bonus_stake", "status", "payout", "net_pnl", "legs", "notes", "settled_at"]
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(cols)
+    for b in repo.list_bets():
+        cash = float(b.get("cash_stake") or 0)
+        status = b.get("status")
+        net = (float(b.get("payout") or 0) - cash) if status == "win" else (-cash if status == "loss" else 0)
+        legs = " | ".join(f"{l.get('fight_name','')}: {l.get('selection','')} ({l.get('american_odds') if l.get('american_odds') is not None else ''}) [{l.get('status','')}]" for l in b.get("legs") or [])
+        row = {**b, "net_pnl": round(net, 2), "legs": legs}
+        w.writerow([_csv_cell(row.get(c)) for c in cols])
+    return Response(out.getvalue(), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="ufc-v3-bets.csv"'})
 
 
 @app.post("/api/import/legacy")

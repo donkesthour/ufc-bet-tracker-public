@@ -14,7 +14,7 @@ const busyBets = new Set();
 const fighterSpecials = new Set(['Fighter to win in under 60 seconds']);
 const themeKey = 'ufc_v3_color_theme';
 function applyTheme(value) {
-  const theme = value || 'octagon';
+  const theme = value || 'legacy-crimson';
   const activeTheme = theme === 'octagon' ? '' : theme;
   document.documentElement.dataset.theme = activeTheme;
   document.body.dataset.theme = activeTheme;
@@ -24,7 +24,7 @@ function applyTheme(value) {
 function setupThemePicker() {
   const picker = $('#theme-select');
   if (!picker) return;
-  applyTheme(localStorage.getItem(themeKey) || 'octagon');
+  applyTheme(localStorage.getItem(themeKey) || 'legacy-crimson');
   picker.onchange = () => {
     applyTheme(picker.value);
     localStorage.setItem(themeKey, picker.value);
@@ -628,7 +628,7 @@ async function commitQueuedBet(bet, editId) {
     message((editId ? 'Update' : 'Save') + ' not confirmed: ' + error.message + '. Refresh before retrying to avoid duplicates.', true);
   } finally {
     queuedWrites = Math.max(0, queuedWrites - 1);
-    if (!queuedWrites) $('#connection').textContent='● SQLite connected · ' + (active?.name || 'all events');
+    if (!queuedWrites) $('#connection').textContent='● Connected';
   }
 }
 function queueTicketSave(bet) {
@@ -697,7 +697,7 @@ function bookBucket(book) {
 }
 function bookButtons(b) {
   const current = bookBucket(b.book);
-  const next = current === 'FD' ? 'DK' : current === 'DK' ? 'Other' : 'FD';
+  const next = current === 'DK' ? 'FD' : current === 'FD' ? 'Other' : 'DK';
   return `<button type="button" class="book-label book-cycle book-${current.toLowerCase()}" data-id="${esc(b.id)}" data-book-set="${next}" aria-label="Sportsbook ${esc(b.book || 'Other')}. Click to change to ${next}" title="Click to change to ${next}"${busyBets.has(b.id + ':book') ? ' disabled' : ''}>${esc(b.book || 'Other')}</button>`;
 }
 function realizedPnl(b) {
@@ -884,13 +884,57 @@ function renderAnalytics(scopeStats, timeline) {
   $('#book-stats').innerHTML=scopeStats.by_book.map(b=>`<span><b>${esc(b.book || 'Other')}</b> ${b.count} bets · ${money(b.cash_staked)} cash</span>`).join('') || '<span class="muted">No bets in this scope yet.</span>';
   renderProfitChart(timeline);
 }
+
+let ebStart = null, ebTimer = null;
+function nyStartMs(dateStr, timeStr) {
+  const m = /(\d{1,2}):(\d{2})\s*(AM|PM)/i.exec(timeStr || '');
+  if (!dateStr || !m) return null;
+  let hr = Number(m[1]) % 12 + (m[3].toUpperCase() === 'PM' ? 12 : 0);
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const guess = Date.UTC(y, mo - 1, d, hr, Number(m[2]));
+  const part = new Intl.DateTimeFormat('en-US', {timeZone: 'America/New_York', timeZoneName: 'longOffset'}).formatToParts(new Date(guess)).find(p => p.type === 'timeZoneName')?.value || 'GMT-05:00';
+  const o = /GMT([+-])(\d{2}):(\d{2})/.exec(part);
+  const offMin = o ? (o[1] === '-' ? -1 : 1) * (Number(o[2]) * 60 + Number(o[3])) : -300;
+  return guess - offMin * 60000;
+}
+function renderCountdown() {
+  const el = $('#eb-count'); if (!el) return;
+  if (ebStart == null) { el.textContent = ''; return; }
+  const diff = ebStart - Date.now();
+  if (diff <= 0) { el.textContent = diff > -6 * 3600e3 ? '● Live now' : 'Event complete'; return; }
+  const d = Math.floor(diff / 864e5), h = Math.floor(diff % 864e5 / 36e5), m = Math.floor(diff % 36e5 / 6e4);
+  el.textContent = 'Main card in ' + (d ? d + 'd ' : '') + (d || h ? h + 'h ' : '') + m + 'm';
+}
+function renderEventBar(allBetRows) {
+  const ev = active;
+  const evBets = ev ? allBetRows.filter(b => b.event_id === ev.id) : [];
+  const fights = ev?.fights?.length || 0;
+  ebStart = ev ? nyStartMs(ev.event_date, ev.main_start) : null;
+  $('#eb-name').textContent = ev?.name || 'No active event';
+  $('#eb-meta').innerHTML = ev ? `${esc(ev.event_date || 'Date TBD')} · ${fights} fights · ${evBets.length} pick${evBets.length === 1 ? '' : 's'} placed${ev.main_start ? ' · Main ' + esc(ev.main_start) : ''} <span id="eb-count" class="eb-count"></span>` : '';
+  const settled = allBetRows.filter(b => b.status === 'win' || b.status === 'loss');
+  const pnl = allBetRows.reduce((s, b) => s + realizedPnl(b), 0);
+  const staked = settled.reduce((s, b) => s + (Number(b.cash_stake) || 0), 0);
+  const roi = staked ? pnl / staked * 100 : 0;
+  const w = allBetRows.filter(b => b.status === 'win').length, l = allBetRows.filter(b => b.status === 'loss').length, p = allBetRows.filter(b => b.status === 'pending').length;
+  const open = allBetRows.filter(b => b.status === 'pending').reduce((s, b) => s + (Number(b.cash_stake) || 0), 0);
+  const sign = n => (n < 0 ? '-' : '+');
+  $('#eb-chips').innerHTML = [
+    ['All-time P/L', `<span class="${pnl < 0 ? 'neg' : 'pos'}">${sign(pnl)}${money(Math.abs(pnl))}</span>`],
+    ['ROI', `<span class="${roi < 0 ? 'neg' : 'pos'}">${roi.toFixed(1)}%</span>`],
+    ['Record', `${w}-${l}-${p}`],
+    ['Open exposure', money(open)]
+  ].map(([k, v]) => `<div class="eb-chip"><label>${k}</label><b>${v}</b></div>`).join('');
+  renderCountdown();
+  clearInterval(ebTimer); ebTimer = setInterval(renderCountdown, 30000);
+}
 async function load() {
   const version=++loadVersion;
   const activeScope = active?.id ? '?event_id=' + encodeURIComponent(active.id) : '';
   const analyticsQuery = statsScope === 'active' ? activeScope : '';
-  const [list,scopeDash,scopeBets,scopeStats,timeline]=await Promise.all([
+  const [list,scopeDash,scopeBets,scopeStats,timeline,allBets]=await Promise.all([
     api('api/bets' + ($('#event-only').checked ? activeScope : '')), api('api/dashboard' + analyticsQuery), api('api/bets' + analyticsQuery),
-    api('api/statistics' + analyticsQuery), api('api/profit-timeline' + analyticsQuery)
+    api('api/statistics' + analyticsQuery), api('api/profit-timeline' + analyticsQuery), api('api/bets')
   ]);
   if(version !== loadVersion) return;
   bets=list.bets;
@@ -899,8 +943,9 @@ async function load() {
   const scopeLabel=statsScope === 'active' ? 'Active' : 'All-event';
   $('#stats').innerHTML=[[scopeLabel+' bets',scopeDash.total_bets],['Pending',`<button type="button" class="stat-link" data-pending-jump="true" title="Show pending bets from all events in the ledger">${scopeDash.pending} · view</button>`],['Cash at risk',money(exposure)],['Win / loss',scopeDash.won+' / '+scopeDash.lost],[scopeLabel+' realized P/L',money(scopeDash.profit)]].map(([k,v])=>`<div class="stat"><label>${k}</label><b>${v}</b></div>`).join('');
   renderAnalytics(scopeStats,timeline);
+  renderEventBar(allBets.bets);
   window.dispatchEvent(new Event('ufc-bets-loaded'));
-  $('#connection').textContent='● SQLite connected · ' + (active?.name || 'all events'); renderBets();
+  $('#connection').textContent='● Connected'; renderBets();
 }
 $('#status-controls').innerHTML=['',...statuses].map(s=>`<button type="button" data-filter="${s}" aria-pressed="${!s}">${s ? title(s) : 'All'}</button>`).join('');
 $('#status-controls').onclick=e=>{ const b=e.target.closest('[data-filter]'); if(b) {filter=b.dataset.filter; selected('#status-controls','filter',filter);renderBets();} };
@@ -973,4 +1018,30 @@ loadEvents().catch(error=>{ $('#connection').textContent='Connection needs atten
       btn.disabled=false; btn.textContent='\u2191 Update';
     }
   });
+})();
+
+document.addEventListener('click',e=>{const m=document.querySelector('.export-menu');if(m&&m.open&&(!m.contains(e.target)||e.target.closest('.export-pop a')))m.open=false;});
+
+(function oddsTip(){
+  const btn=$('#odds-tip-btn'), pop=$('#odds-tip-pop'); if(!btn||!pop) return;
+  let configured=false;
+  const paint=()=>{
+    btn.classList.toggle('live',configured);
+    btn.firstChild.textContent=configured?'Live odds ready ':'Catalog odds ';
+    pop.innerHTML=(configured
+      ?'<h3>✓ Live odds connected</h3><p>Use <b>Refresh odds</b> to pull current DraftKings / FanDuel moneylines for this card. Each refresh uses 1 of your 500 free monthly requests.</p><p class="muted">Paste a new key below to replace the saved one.</p>'
+      :'<h3>Odds shown are catalog defaults</h3><p>Add a free key from The Odds API to pull live DraftKings / FanDuel moneylines.</p><ol><li>Go to <a href="https://the-odds-api.com/" target="_blank" rel="noopener noreferrer">the-odds-api.com</a> and click <b>Get API Key</b>.</li><li>Pick the free plan (500 requests/month) and enter your email.</li><li>Copy the key from the confirmation email and paste it below.</li></ol>')
+      +'<form id="odds-key-form"><input id="odds-key-input" type="password" autocomplete="off" placeholder="Paste API key" aria-label="Odds API key"><button class="secondary" type="submit">Save</button></form><p id="odds-key-msg" class="odds-msg" role="status"></p><small>Stored only on this computer (.env). Moneylines only; prelims may lack lines until fight week.</small>';
+  };
+  const open=v=>{pop.hidden=!v;btn.setAttribute('aria-expanded',String(v));if(v)$('#odds-key-input')?.focus();};
+  btn.onclick=e=>{e.stopPropagation();open(pop.hidden);};
+  document.addEventListener('click',e=>{if(!pop.hidden&&!e.target.closest('.odds-tip'))open(false);});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!pop.hidden){open(false);btn.focus();}});
+  pop.onsubmit=async e=>{
+    e.preventDefault();const msg=$('#odds-key-msg'),input=$('#odds-key-input');msg.className='odds-msg';msg.textContent='Saving…';
+    try{await api('api/odds-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:input.value})});configured=true;paint();$('#odds-key-msg').className='odds-msg ok';$('#odds-key-msg').textContent='Saved. Click Refresh odds to pull lines.';}
+    catch(err){msg.className='odds-msg error';msg.textContent=err.message;}
+  };
+  paint();
+  api('api/odds-key').then(r=>{configured=!!r.configured;paint();}).catch(()=>{});
 })();

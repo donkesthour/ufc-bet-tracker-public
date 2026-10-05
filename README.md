@@ -67,8 +67,12 @@ logging bets.
   and optional ESPN result sync (display only — it never rewrites your bets).
 - **Statistics** — per-event and all-time P/L, ROI, win rate, and a cumulative
   P/L chart (straight bets and parlays split evenly across legs).
-- **Export JSON** (header) — download everything as JSON for backup. Copying
-  the `.db` file while the app is stopped also works.
+- **Export** (header) — one menu with two options: **JSON** (full backup) and
+  **CSV** (one row per bet, with net P/L and parlay legs flattened, for
+  spreadsheets). Copying the `.db` file while the app is stopped also works.
+- **Live odds** — the **Catalog odds** badge on the card section is a tooltip.
+  Until a key is set, odds are catalog defaults; see
+  [Getting live odds](#getting-live-odds-optional) below.
 
 ## Sharing with someone
 
@@ -130,6 +134,22 @@ Copy `.env.example` to `.env` (the launch script loads it automatically):
 | `UFC_V3_DB` | SQLite file path (default `./ufc-bet-tracker-v3.db`) |
 | `THE_ODDS_API_KEY` | Optional — enables **Refresh odds** (moneylines from DraftKings/FanDuel via [the-odds-api.com](https://the-odds-api.com)) |
 | `UFC_V3_UPDATE_DISABLE` | Set to `1` to hide the in-app updater |
+
+### Getting live odds (optional)
+
+Free, takes about two minutes:
+
+1. Go to [the-odds-api.com](https://the-odds-api.com) and click **Get API Key**.
+2. Choose the free plan (500 requests/month) and enter your email.
+3. Copy the key from the confirmation email.
+4. In the tracker, click the **Catalog odds ⓘ** badge, paste the key, and press
+   **Save**. It's written to `.env` on your computer and works immediately — no
+   restart. (You can also put `THE_ODDS_API_KEY=...` in `.env` yourself.)
+5. Press **Refresh odds** to pull current DraftKings / FanDuel moneylines.
+
+Each refresh costs one request. Only moneylines are fetched, and prelims often
+have no lines until fight week. The key can only be saved from the machine
+running the tracker, and it is never sent back to the browser.
 
 ## Running as a service
 
