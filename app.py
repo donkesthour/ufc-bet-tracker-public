@@ -11,6 +11,7 @@ import urllib.request
 import subprocess
 import sys
 import threading
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -571,7 +572,7 @@ def _wikipedia_poster(event_name: str) -> str | None:
     if not (event_name or "").strip():
         return None
     url = ("https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages"
-           "&piprop=original&pilicense=any&generator=search&gsrlimit=1&gsrsearch="
+           "&piprop=original&pilicense=any&generator=search&gsrlimit=6&gsrsearch="
            + quote(f"{event_name} UFC"))
     request = urllib.request.Request(url, headers={"User-Agent": "ufc-bet-tracker/1.0 (event poster lookup)"})
     try:
@@ -579,11 +580,35 @@ def _wikipedia_poster(event_name: str) -> str | None:
             payload = json.loads(r.read().decode("utf-8"))
     except (URLError, TimeoutError):
         return None
-    for page in (payload.get("query") or {}).get("pages", {}).values():
+    # Search ranking is unreliable (the top hit for one fight night can be the next week's page),
+    # so only accept a page whose TITLE matches this event, best-ranked first.
+    pages = sorted((payload.get("query") or {}).get("pages", {}).values(), key=lambda p: p.get("index", 99))
+    for page in pages:
+        if not _poster_title_matches(event_name, page.get("title") or ""):
+            continue
         source = ((page.get("original") or {}).get("source") or "").split("?")[0]
         if source.lower().endswith((".jpg", ".jpeg", ".png")):
             return source
     return None
+
+
+def _poster_title_matches(event_name: str, title: str) -> bool:
+    def norm(s: str) -> str:
+        s = unicodedata.normalize("NFKD", s or "")
+        return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", "".join(c for c in s if not unicodedata.combining(c)).lower())).strip()
+    name, ttl = norm(event_name), norm(title)
+    if not name or not ttl:
+        return False
+    if name == ttl:
+        return True
+    number = re.match(r"ufc (\d+)\b", name)
+    if number:  # numbered card: Wikipedia title is "UFC 333"
+        return re.match(rf"ufc {number.group(1)}\b", ttl) is not None
+    if " vs " in name:  # fight night: every fighter surname must appear in the page title
+        sides = name.split(":")[-1].split(" vs ")
+        surnames = [s.split()[-1] for s in sides if s.split()]
+        return bool(surnames) and all(re.search(rf"\b{re.escape(n)}\b", ttl) for n in surnames)
+    return False
 
 
 @app.post("/api/events/{event_id}/poster/fetch")
