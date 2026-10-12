@@ -456,7 +456,7 @@ def espn_results(event_id: str) -> list[dict]:
 
 
 class ResultIn(BaseModel):
-    winner_side: str
+    winner_side: str = ""
     method: str
     round: int | None = None
     clock: str = ""

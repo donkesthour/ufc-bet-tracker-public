@@ -125,6 +125,9 @@ function fighterParlayRoundOptions(max) {
   if (max >= 5) ranges.push('3-4','4-5','1-2-3','2-3-4','3-4-5');
   return single.concat(ranges.map(r => `<option value="Rounds ${r}">Rounds ${r}</option>`)).join('');
 }
+function roundRangeChoices(max) {
+  return Array.from({length:max},(_,i)=>`Round ${i+1}`).concat(max >= 5 ? ['Rounds 1-2','Rounds 2-3','Rounds 3-4','Rounds 4-5','Rounds 1-2-3','Rounds 2-3-4','Rounds 3-4-5'] : ['Rounds 1-2','Rounds 2-3']);
+}
 function setSelection(value, market = '', round = '') {
   $('#selection').value = value;
   $('#market').value = market;
@@ -161,7 +164,7 @@ function renderSelectionBuilder() {
   } else if (type === 'Method of Victory') {
     container.innerHTML = `<div class="workflow-step"><label>Fighter</label>${choiceButtons('fighter', fighterValues(fight,true))}<label>Method</label>${choiceButtons('method', methods)}</div>`;
   } else if (type === 'Round Prop' || type === 'Round Betting') {
-    container.innerHTML = `<div class="workflow-step"><label>Fighter</label>${choiceButtons('fighter', fighterValues(fight,true,'Any / Fight Ends In'))}<label>Round</label>${choiceButtons('round', Array.from({length:max},(_,i)=>String(i+1)))}</div>`;
+    container.innerHTML = `<div class="workflow-step"><label>Fighter</label>${choiceButtons('fighter', fighterValues(fight,true,'Any / Fight Ends In'))}<label>Round/range</label>${choiceButtons('round', roundRangeChoices(max))}</div>`;
   } else if (type === 'Over/Under') {
     container.innerHTML = `<div class="workflow-step"><label>Direction</label>${choiceButtons('direction',['Over','Under'])}<label>Unit</label>${choiceButtons('unit',['Rounds','Minutes'])}<label>Line</label>${ouLineButtons('Rounds',max)}</div>`;
   } else if (type === 'Point Spread') {
@@ -171,7 +174,7 @@ function renderSelectionBuilder() {
   } else if (type === 'Fighter Props') {
     container.innerHTML = `<div class="workflow-step"><label>Fighter</label>${choiceButtons('fighter', fighterValues(fight,false))}<label>Stat</label>${choiceButtons('stat',['Takedowns','Significant Strikes'])}<label>Direction</label>${choiceButtons('direction',['Over','Under'])}<label>Line</label><input data-builder="line" type="number" step="0.5" value="1.5"></div>`;
   } else if (type === 'Fighter Parlay') {
-    container.innerHTML = `<div class="workflow-step"><label>Fighter</label>${choiceButtons('fighter', fighterValues(fight,true))}<label>Method</label>${choiceButtons('method', methods)}<label>Round/range</label>${choiceButtons('round', Array.from({length:max},(_,i)=>`Round ${i+1}`).concat(max >= 5 ? ['Rounds 1-2','Rounds 2-3','Rounds 3-4','Rounds 4-5','Rounds 1-2-3','Rounds 2-3-4','Rounds 3-4-5'] : ['Rounds 1-2','Rounds 2-3']))}</div>`;
+    container.innerHTML = `<div class="workflow-step"><label>Fighter</label>${choiceButtons('fighter', fighterValues(fight,true))}<label>Method</label>${choiceButtons('method', methods)}<label>Round/range</label>${choiceButtons('round', roundRangeChoices(max))}</div>`;
   } else if (type === 'Go the Distance') {
     container.innerHTML = `<div class="workflow-step"><label>Goes distance?</label>${choiceButtons('answer',['Yes','No'])}</div>`;
   } else if (type === 'Other') {
@@ -192,7 +195,7 @@ function updateBuiltSelection() {
   if (type === 'Moneyline') { updateSelectionBuilderPressed(); return; }
   let value = '', market = '', round = '';
   if (type === 'Method of Victory') { const f=get('fighter'), m=get('method'); value = f ? `${f} by ${m}` : `Fight will end by ${m}`; market = m; }
-  else if (type === 'Round Prop' || type === 'Round Betting') { const f=get('fighter'), r=get('round'); value = f ? `${f} in Round ${r}` : `Fight will end in Round ${r}`; round = `Round ${r}`; }
+  else if (type === 'Round Prop' || type === 'Round Betting') { const f=get('fighter'), r=get('round'); value = f ? `${f} in ${r}` : `Fight will end in ${r}`; round = r; }
   else if (type === 'Over/Under') { const d=get('direction'), l=get('line'), u=get('unit') === 'Minutes' ? 'minutes' : 'rounds'; value = `${d} ${l} ${u}`; market = d; }
   else if (type === 'Point Spread') { value = `${get('fighter')} ${get('spread')}`; market = get('spread'); }
   else if (type === 'Fight to Start Round') { value = `Fight to start Round ${get('round')}`; round = `Round ${get('round')}`; }
@@ -466,9 +469,11 @@ function syncParlaySaveUI() {
   const legs = [...$('#legs').children];
   const hasLegs = isParlayTicket() && legs.length > 0;
   const completeLegs = legs.length >= 2 && legs.every(leg => leg.querySelector('.leg-fight').value.trim() && leg.querySelector('.leg-selection').value.trim());
-  $('#save-parlay').hidden = !hasLegs;
-  $('#save-parlay').disabled = hasLegs && !completeLegs;
-  $('#save').hidden = hasLegs;
+  $('#save-parlay').hidden = true; // the floating Save button doubles as Save parlay
+  $('#save').hidden = false;
+  $('#selection').required = !hasLegs;
+  $('#save').disabled = hasLegs && !completeLegs;
+  $('#save').textContent = editingBetId ? 'Update bet' : hasLegs ? 'Save parlay' : 'Save bet';
 }
 function clearStagedPickAfterLeg() {
   const keepPick = $('#keep-pick').checked;
@@ -510,7 +515,7 @@ $('#book-controls').onclick = e => {
   $('#book').value=b.dataset.book; selected('#book-controls','book',b.dataset.book);
   $('#other-book-label').hidden=b.dataset.book !== 'Other';
 };
-const types = ['Moneyline','Method of Victory','Parlay','Fighter Parlay','Fight to Start Round','Fighter Props','Round Prop','Round Betting','Go the Distance','Over/Under','Point Spread','Other'];
+const types = ['Moneyline','Method of Victory','Fighter Parlay','Fight to Start Round','Fighter Props','Round Betting','Go the Distance','Over/Under','Point Spread','Other'];
 $('#type-controls').innerHTML = types.map(t => `<button type="button" data-type="${t}" aria-pressed="${t === 'Moneyline'}">${t}</button>`).join('');
 $('#type-controls').onclick = e => { const b=e.target.closest('[data-type]'); if(b) setType(b.dataset.type); };
 $('#selection-builder').onclick = e => {
@@ -550,8 +555,8 @@ function duplicateKey(b) {
 }
 function resetEditMode() {
   editingBetId = null;
-  $('#save').textContent = 'Save bet';
   $('#cancel-edit').hidden = true;
+  syncParlaySaveUI();
   $('#message').className = '';
 }
 function resetTicketAfterQueue() {
@@ -598,7 +603,7 @@ function loadBetIntoTicket(id, {duplicate = false} = {}) {
   $('#legs').innerHTML = '';
   (bet.legs || []).forEach(leg => addLeg({fight_name:leg.fight_name, selection:leg.selection, american_odds:leg.american_odds}));
   updateSelectionBuilderPressed(); preview();
-  $('#save').textContent = duplicate ? 'Save bet' : 'Update bet';
+  syncParlaySaveUI();
   $('#cancel-edit').hidden = duplicate;
   message((duplicate ? 'Duplicated into ticket · ' : 'Editing loaded · ') + (bet.selection || bet.fight_name));
   form.scrollIntoView({behavior:'smooth', block:'start'});
@@ -640,20 +645,41 @@ function queueTicketSave(bet) {
   resetTicketAfterQueue();
   $('#cash_stake').focus({preventScroll:true});
 }
+function parlayTitle(legs) {
+  const fold = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const last = n => (fold(n).trim().split(/\s+/).pop() || '').toUpperCase();
+  const code = leg => {
+    const sel = fold(leg.selection).trim();
+    const sides = fold(leg.fight_name).split(/\s+vs\.?\s+/i).map(x => x.trim()).filter(Boolean);
+    const ou = sel.match(/^(over|under)\s+([\d.]+)\s*(round|minute|min)?/i);
+    if (ou) return {kind:'ou', text:`${ou[1][0].toUpperCase()}${ou[2]}${/^m/i.test(ou[3] || '') ? 'M' : 'R'} ${sides.map(last).join('-')}`};
+    const side = sides.find(x => sel.toLowerCase().startsWith(x.toLowerCase()));
+    const rest = side ? sel.slice(side.length).trim() : '';
+    const who = side ? last(side) : last(sel);
+    if (!rest) return {kind:'ml', text:who};
+    const m = rest.replace(/^(by|to win|to)\s+/i, '');
+    const round = (m.match(/round\s*(\d)/i) || [])[1];
+    let method = /ko\/tko or sub|ko\/tko\/sub|finish/i.test(m) ? 'FIN' : /ko|tko/i.test(m) ? 'KO' : /sub/i.test(m) ? 'SUB' : /decision|points/i.test(m) ? 'DEC' : '';
+    if (!method && !round) method = m.toUpperCase().slice(0, 12);
+    return {kind:'prop', text:[who, method, round ? 'R' + round : ''].filter(Boolean).join(' ')};
+  };
+  const parts = legs.map(code);
+  return parts.every(x => x.kind === 'ml') ? 'ML ' + parts.map(x => x.text).join('/') : parts.map(x => x.text).join(' + ');
+}
 function saveParlay() {
   const bet = payload();
   if (!isParlayTicket() || bet.legs.length < 2 || bet.legs.some(leg => !leg.fight_name || !leg.selection)) {
     message('Add at least two parlay legs with fight and selection before saving.', true); return;
   }
   bet.fight_name = `${bet.legs.length}-leg parlay`;
-  bet.selection = 'Parlay';
+  bet.selection = parlayTitle(bet.legs);
   bet.market = ''; bet.round_label = '';
   queueTicketSave(bet);
 }
 $('#save-parlay').onclick = saveParlay;
 form.onsubmit = e => {
   e.preventDefault();
-  queueTicketSave(payload());
+  if (isParlayTicket() && $('#legs').children.length) saveParlay(); else queueTicketSave(payload());
 };
 async function setStatus(id,status,override) {
   if(busyBets.has(id)) return;

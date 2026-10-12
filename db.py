@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+from functools import lru_cache
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -68,6 +69,13 @@ def scheduled_minutes(value: Any) -> int | None:
     return (hour % 12 + (12 if meridiem == "pm" else 0)) * 60 + minute
 
 
+@lru_cache(maxsize=8192)
+def _watch_norm_cached(text: str) -> str:
+    normalized = text.lower().replace("dooho", "doo ho").replace("joosang", "joo sang").replace("tko", "ko").replace(".", "").strip()
+    decomposed = unicodedata.normalize("NFKD", normalized)
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
 @dataclass(frozen=True)
 class MoneyOutcome:
     winner: str
@@ -78,7 +86,7 @@ class MoneyOutcome:
 RESULTS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS fight_results (
   event_id TEXT NOT NULL, fight_key TEXT NOT NULL, fighter_a TEXT NOT NULL, fighter_b TEXT NOT NULL,
-  winner TEXT NOT NULL, method TEXT NOT NULL CHECK(method IN ('ko','sub','dec')), round INTEGER, clock TEXT NOT NULL DEFAULT '',
+  winner TEXT NOT NULL, method TEXT NOT NULL CHECK(method IN ('ko','sub','dec','draw','nc')), round INTEGER, clock TEXT NOT NULL DEFAULT '',
   source TEXT NOT NULL CHECK(source IN ('espn','manual')), updated_at TEXT NOT NULL,
   PRIMARY KEY(event_id, fight_key)
 );
@@ -125,6 +133,13 @@ class TrackerRepository:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connection() as conn:
             conn.executescript(SCHEMA)
+            # Older fight_results CHECK only allowed ko/sub/dec; rebuild so draw / no contest can be stored.
+            old = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='fight_results'").fetchone()
+            if old and "'draw'" not in old["sql"]:
+                conn.execute("ALTER TABLE fight_results RENAME TO fight_results_old")
+                conn.executescript(RESULTS_SCHEMA)
+                conn.execute("INSERT INTO fight_results SELECT * FROM fight_results_old")
+                conn.execute("DROP TABLE fight_results_old")
             conn.executescript(RESULTS_SCHEMA)
             # v3 began with a minimal events table; upgrade it in place.
             known = {row["name"] for row in conn.execute("PRAGMA table_info(events)")}
@@ -496,9 +511,7 @@ class TrackerRepository:
         return {"scope": "all", "event_id": None, "points": points}
 
     def _watch_norm(self, text: Any) -> str:
-        normalized = str(text or "").lower().replace("dooho", "doo ho").replace("joosang", "joo sang").replace("tko", "ko").replace(".", "").strip()
-        decomposed = unicodedata.normalize("NFKD", normalized)
-        return "".join(char for char in decomposed if not unicodedata.combining(char))
+        return _watch_norm_cached(str(text or ""))
 
     def _watch_fight_key(self, fight: dict) -> str:
         return self._watch_norm(f"{fight['fighter_a']} vs {fight['fighter_b']}")
@@ -649,17 +662,20 @@ class TrackerRepository:
         return cur.rowcount > 0
 
     def set_result(self, event_id: str, fight_index: int, winner_side: str, method: str, rnd: int | None, clock: str = "", source: str = "manual") -> dict:
-        if winner_side not in ("a", "b"): raise ValueError("winner must be a or b")
-        if method not in ("ko", "sub", "dec"): raise ValueError("method must be ko, sub or dec")
-        if method != "dec" and (rnd is None or not 1 <= int(rnd) <= 5): raise ValueError("finish needs round 1-5")
-        clock = "" if method == "dec" else clean_clock(clock)
+        no_winner = method in ("draw", "nc")
+        if not no_winner and winner_side not in ("a", "b"): raise ValueError("winner must be a or b")
+        if method not in ("ko", "sub", "dec", "draw", "nc"): raise ValueError("method must be ko, sub, dec, draw or nc")
+        if method in ("ko", "sub") and (rnd is None or not 1 <= int(rnd) <= 5): raise ValueError("finish needs round 1-5")
+        if method in ("dec", "draw", "nc"): clock = ""
+        else: clock = clean_clock(clock)
+        if no_winner: rnd = None
         with self.connection() as conn:
             fight = conn.execute("SELECT * FROM fights WHERE event_id=? AND fight_index=?", (event_id, fight_index)).fetchone()
             if not fight: raise ValueError("fight not found")
             key = self._rkey(fight["fighter_a"], fight["fighter_b"])
             conn.execute("""INSERT INTO fight_results(event_id,fight_key,fighter_a,fighter_b,winner,method,round,clock,source,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(event_id,fight_key) DO UPDATE SET winner=excluded.winner,method=excluded.method,round=excluded.round,clock=excluded.clock,source=excluded.source,updated_at=excluded.updated_at""",
-                (event_id, key, fight["fighter_a"], fight["fighter_b"], fight["fighter_a"] if winner_side == "a" else fight["fighter_b"], method, None if method == "dec" and rnd is None else int(rnd), clock, source, utc_now()))
+                (event_id, key, fight["fighter_a"], fight["fighter_b"], "" if no_winner else fight["fighter_a"] if winner_side == "a" else fight["fighter_b"], method, None if rnd is None else int(rnd), clock, source, utc_now()))
             # Declaring a result settles any open result-vs-result dispute for this fight (bet disputes stay until reviewed).
             conn.execute("UPDATE result_disputes SET status='resolved',resolution='manual_override',resolved_at=? WHERE event_id=? AND fight_key=? AND kind='result' AND status='open'", (utc_now(), event_id, key))
         return self.list_results(event_id)

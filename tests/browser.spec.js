@@ -142,7 +142,6 @@ test('parlay legs notes and custom book survive save and reload',async({page,req
   await expect(page.locator('#keep-pick')).toBeChecked();
   await page.getByRole('button',{name:'Other',exact:true}).first().click();
   await page.locator('#other-book').fill('Custom Book');
-  await page.getByRole('button',{name:'Parlay',exact:true}).click();
   const sportsbookGroup = page.getByRole('group',{name:'Sportsbook', exact:true});
   await expect(sportsbookGroup).toBeVisible();
   await expect(page.getByRole('button',{name:'+ Add to Parlay',exact:true})).toBeVisible();
@@ -152,7 +151,7 @@ test('parlay legs notes and custom book survive save and reload',async({page,req
   await expect(page.locator('#matchup')).toHaveValue('0');
   await expect(page.locator('#selection')).toHaveValue('');
   await page.getByRole('button',{name:'+ Add custom leg',exact:true}).click();
-  await expect(page.getByRole('button',{name:'Save Parlay',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Save parlay',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Save bet',exact:true})).toBeHidden();
   await page.getByLabel('Leg fight',{exact:true}).nth(1).fill('Outside card');
   await page.getByLabel('Leg selection',{exact:true}).nth(1).fill('Custom leg');
@@ -161,7 +160,7 @@ test('parlay legs notes and custom book survive save and reload',async({page,req
   await page.getByLabel('Live stream',{exact:true}).check();
   await page.locator('#american_odds').fill('250');
   await page.getByRole('button',{name:'+$10',exact:true}).click();
-  await page.getByRole('button',{name:'Save Parlay',exact:true}).click();
+  await page.getByRole('button',{name:'Save parlay',exact:true}).click();
   await expect(page.locator('#message')).toContainText('committed');
   await expect(page.locator('#fight_name')).toHaveValue('Fighter Alpha vs. Fighter Bravo');
   await expect(page.locator('#matchup')).toHaveValue('0');
@@ -171,7 +170,7 @@ test('parlay legs notes and custom book survive save and reload',async({page,req
   const bet=data.bets.find(b=>b.notes==='Browser parlay contract');
   try {
     expect(bet.book).toBe('Custom Book');expect(bet.is_live_stream).toBeTruthy();
-    expect(bet.fight_name).toBe('2-leg parlay');expect(bet.selection).toBe('Parlay');
+    expect(bet.fight_name).toBe('2-leg parlay');expect(bet.selection).toBe('ML ALPHA/LEG');
     expect(bet.legs).toHaveLength(2);expect(bet.legs[0].fight_name).toBe('Fighter Alpha vs. Fighter Bravo');expect(bet.legs[1].selection).toBe('Custom leg');expect(bet.legs[1].american_odds).toBeNull();
     await page.reload();
     const row=page.locator('#bets tr').filter({hasText:'Custom Book'});
@@ -341,7 +340,7 @@ test('custom matchup does not select first fight; whole rounds; mobile fits',asy
   await page.locator('#american_odds').fill('200');
   await page.locator('#matchup').selectOption('');
   await expect(page.locator('#fight_name')).toHaveValue('Custom fight');
-  for(const type of ['Fight to Start Round','Fighter Parlay','Round Prop']) {
+  for(const type of ['Fight to Start Round','Fighter Parlay','Round Betting']) {
     await page.getByRole('button',{name:type,exact:true}).click();
     expect(await page.locator('#round').innerText()).not.toContain('.5');
   }

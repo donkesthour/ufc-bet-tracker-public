@@ -198,6 +198,13 @@
 .ui-polish .leg-result>.tag{justify-self:end;margin-top:1px}
 .ui-polish .leg-result>.status-actions{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;min-width:0}
 .ui-polish .leg-result>.status-actions button{min-height:38px;padding:7px 10px;font-size:11px}
+/* Ledger only: leg status buttons sit right of the leg text as a 2x2 grid; labels stay on one line. */
+.ui-polish .workspace-ledger .leg-result{gap:6px 10px}
+.ui-polish .workspace-ledger .leg-result>.leg-copy{grid-column:1;grid-row:1 / span 2}
+.ui-polish .workspace-ledger .leg-result>.tag{grid-column:2;grid-row:1;justify-self:end;margin-top:0}
+.ui-polish .workspace-ledger .leg-result>.status-actions{grid-column:2;grid-row:2;grid-template-columns:repeat(2,max-content);gap:4px;min-width:0;justify-self:end}
+.ui-polish .workspace-ledger .leg-result>.status-actions button{min-height:26px;padding:4px 8px;font-size:10px;line-height:1.2;white-space:nowrap}
+@media(max-width:580px){.ui-polish .workspace-ledger .leg-result{grid-template-columns:minmax(0,1fr)}.ui-polish .workspace-ledger .leg-result>.leg-copy{grid-column:1;grid-row:auto}.ui-polish .workspace-ledger .leg-result>.tag{grid-column:1;grid-row:auto;justify-self:start}.ui-polish .workspace-ledger .leg-result>.status-actions{grid-column:1;grid-row:auto;grid-template-columns:repeat(2,minmax(0,1fr));justify-self:stretch;width:100%}.ui-polish .workspace-ledger .leg-result>.status-actions button{width:100%;min-height:34px;font-size:11px}}
 @media(max-width:580px){.sportsbook-row{grid-template-columns:1fr}.add-parlay-quick{width:100%;justify-content:center}.parlay-actions{display:grid;grid-template-columns:1fr 1fr}.parlay-actions #save-parlay{grid-column:1/-1;margin-left:0}.ui-polish .leg-result>.status-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 
@@ -360,3 +367,56 @@ input,select,textarea{background:var(--field)}
 .odds-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:340px;max-width:calc(100vw - 40px);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:0 12px 36px #000a;font-size:12px;line-height:1.5;color:var(--ink)}
 .odds-pop[hidden]{display:none}.odds-pop h3{margin:0 0 6px;font-size:13px}.odds-pop ol{margin:8px 0 12px;padding-left:18px;color:var(--muted)}.odds-pop li{margin:3px 0}.odds-pop a{color:var(--accent);text-decoration:underline}
 .odds-pop form{display:flex;gap:8px}.odds-pop input{flex:1;min-width:0;font-size:12px}.odds-pop .odds-msg{margin:8px 0 0;min-height:16px}.odds-pop small{color:var(--muted);display:block;margin-top:6px}
+
+.ui-polish .workspace-ledger .leg-result>.leg-copy{grid-row:1}
+.ui-polish .workspace-ledger .leg-result>.status-actions{grid-column:1/-1;grid-row:2;grid-template-columns:repeat(4,minmax(0,1fr));justify-self:stretch;width:100%}
+
+.ui-polish .workspace-ledger .leg-result{position:relative}
+.ui-polish .workspace-ledger .leg-result>.status-actions{position:absolute;left:calc(100% + 14px);top:0;width:250px;grid-column:auto;grid-row:auto;grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:900px){.ui-polish .workspace-ledger .leg-result>.status-actions{position:static;width:100%;grid-column:1/-1}}
+
+.settings-menu .export-pop{min-width:210px}
+.settings-menu .menu-item{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;font-size:12px;color:inherit;cursor:pointer;border-radius:6px}
+.settings-menu .menu-item:hover{background:#ffffff12}
+.settings-menu .menu-label{display:block;font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);padding:8px 10px 2px;border-top:1px solid var(--line);margin-top:4px}
+.dash-hidden{display:none!important}
+.workspace.dash-single{grid-template-columns:minmax(0,1fr)}
+.customize-panel{position:fixed;right:20px;top:90px;z-index:50;width:310px;background:#17232ef8;border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 10px 35px #000a;display:grid;gap:8px}
+.customize-panel[hidden]{display:none}
+.cz-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.cz-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px}
+.cz-move{display:flex;gap:4px}.cz-move button{padding:2px 9px;min-height:26px}
+
+.dash-grip{display:none}
+.dash-editing .dash-grip{display:block;cursor:grab;font-size:11px;color:var(--accent);padding:4px 8px;border:1px dashed var(--accent);border-radius:6px;width:max-content;margin:0 0 8px}
+.dash-editing [data-dash-id]{resize:vertical;overflow:auto;min-height:120px;outline:1px dashed #ffffff30}
+.dash-dragging{opacity:.5}
+
+.dash-editing .dash-grip{grid-column:1/-1;justify-self:start}
+.dash-editing #workspace{align-content:start}
+
+.dash-editing [data-dash-id]{resize:both}
+.dash-editing .entry-panel,.dash-editing #ledger{min-width:300px}
+
+.dash-editing [data-dash-id]{resize:none!important}
+.dash-layer{position:absolute;left:0;top:0;width:0;height:0;z-index:40;pointer-events:none}
+.dash-grid{position:absolute;left:0;top:0;display:none;pointer-events:none;background-image:linear-gradient(#ffffff0d 1px,transparent 1px),linear-gradient(90deg,#ffffff0d 1px,transparent 1px)}
+body:not(.dash-editing) .dash-layer{display:none}
+.dash-ov{position:absolute;outline:1px dashed var(--accent);pointer-events:none}
+.dash-ov .dash-grip{display:block;position:absolute;left:8px;top:-1px;pointer-events:auto;cursor:grab;touch-action:none;font-size:11px;color:#16220b;background:var(--accent);padding:3px 9px;border-radius:0 0 6px 6px;margin:0;border:0;width:max-content}
+.dash-ov .dash-grip:active{cursor:grabbing}
+.dash-h{position:absolute;pointer-events:auto;touch-action:none;background:transparent}
+.dash-h:hover{background:var(--accent);opacity:.5}
+.dash-h-n,.dash-h-s{left:12px;right:12px;height:10px}.dash-h-n{top:-5px;cursor:ns-resize}.dash-h-s{bottom:-5px;cursor:ns-resize}
+.dash-h-e,.dash-h-w{top:12px;bottom:12px;width:10px}.dash-h-e{right:-5px;cursor:ew-resize}.dash-h-w{left:-5px;cursor:ew-resize}
+.dash-h-ne,.dash-h-nw,.dash-h-se,.dash-h-sw{width:16px;height:16px;background:var(--accent);opacity:.8;border-radius:3px}
+.dash-h-ne{top:-8px;right:-8px;cursor:nesw-resize}.dash-h-nw{top:-8px;left:-8px;cursor:nwse-resize}.dash-h-se{bottom:-8px;right:-8px;cursor:nwse-resize}.dash-h-sw{bottom:-8px;left:-8px;cursor:nesw-resize}
+.dash-editing .dash-dragging{opacity:.85;z-index:30}
+
+.dash-ov .dash-grip{z-index:3}
+
+/* Subtle backing panel behind ledger parlay legs (extends right to include the settle buttons) */
+.ui-polish .workspace-ledger .leg-results{position:relative;isolation:isolate;margin:14px 0 12px 18px;padding:10px 0 2px}
+.ui-polish .workspace-ledger .leg-results::before{content:"";position:absolute;z-index:-1;top:0;bottom:0;left:-10px;right:-274px;border:1px solid color-mix(in srgb,var(--line) 30%,transparent);border-radius:10px;background:color-mix(in srgb,var(--ink) 1.2%,transparent)}
+.ui-polish .workspace-ledger .leg-result:first-child{padding-top:0}
+@media(max-width:900px){.ui-polish .workspace-ledger .leg-results::before{right:-10px}}
